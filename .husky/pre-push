@@ -1,0 +1,54 @@
+#!/bin/sh
+# Bloqueia push se o PR estiver grande demais vs main.
+# Limites: 3000 linhas alteradas ou 50 arquivos.
+
+MAX_LINES=3000
+MAX_FILES=50
+BASE=origin/main
+
+# Lê o que está sendo pushado (formato: <local_ref> <local_sha> <remote_ref> <remote_sha>)
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Pula deleção de branches
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+
+  # Se está pushando main, não aplica o limite
+  [ "$remote_ref" = "refs/heads/main" ] && continue
+
+  # Verifica se origin/main existe
+  if ! git rev-parse --verify "$BASE" > /dev/null 2>&1; then
+    echo "⚠️  $BASE não encontrado — pulando verificação de tamanho de PR."
+    continue
+  fi
+
+  # Conta arquivos alterados
+  FILES=$(git diff --name-only "$BASE...$local_sha" | wc -l | tr -d ' ')
+
+  # Conta linhas alteradas (adições + remoções)
+  STAT=$(git diff --shortstat "$BASE...$local_sha" 2>/dev/null)
+  INSERTIONS=$(echo "$STAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+  DELETIONS=$(echo "$STAT"  | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' || echo 0)
+  LINES=$((${INSERTIONS:-0} + ${DELETIONS:-0}))
+
+  echo ""
+  echo "📊 Tamanho do PR:"
+  echo "   Arquivos alterados : $FILES / $MAX_FILES"
+  echo "   Linhas alteradas   : $LINES / $MAX_LINES"
+  echo ""
+
+  if [ "$FILES" -gt "$MAX_FILES" ]; then
+    echo "❌ PUSH BLOQUEADO — muitos arquivos alterados ($FILES > $MAX_FILES)."
+    echo "   Quebre o trabalho em PRs menores e mais focados."
+    echo ""
+    exit 1
+  fi
+
+  if [ "$LINES" -gt "$MAX_LINES" ]; then
+    echo "❌ PUSH BLOQUEADO — PR muito grande ($LINES linhas > $MAX_LINES)."
+    echo "   Quebre o trabalho em PRs menores e mais focados."
+    echo ""
+    exit 1
+  fi
+
+  echo "✅ Tamanho OK — pode enviar."
+  echo ""
+done
