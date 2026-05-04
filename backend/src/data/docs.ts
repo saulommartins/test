@@ -1,13 +1,6 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { Doc } from '../types';
 
-export interface Doc {
-  id: string;
-  title: string;
-  language: 'en' | 'es';
-  body: string;
-}
-
-const DOCS: Doc[] = [
+export const DOCS: Doc[] = [
   {
     id: '1',
     title: 'Getting Started with React Hooks',
@@ -45,11 +38,3 @@ const DOCS: Doc[] = [
     body: 'La accesibilidad web garantiza que todos puedan usar tu sitio. Usa etiquetas semánticas como nav, main y article. Asegura un contraste suficiente entre texto y fondo. Soporta navegación por teclado y agrega texto alternativo a las imágenes.',
   },
 ];
-
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-  res.status(200).json(DOCS);
-}
