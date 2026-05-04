@@ -1,54 +1,54 @@
 #!/bin/sh
-# Bloqueia push se o PR estiver grande demais vs main.
-# Limites: 3000 linhas alteradas ou 50 arquivos.
+# Block the push if the PR is too large vs main.
+# Limits: 3000 changed lines or 50 changed files.
 
 MAX_LINES=3000
 MAX_FILES=50
 BASE=origin/main
 
-# Lê o que está sendo pushado (formato: <local_ref> <local_sha> <remote_ref> <remote_sha>)
+# Read what is being pushed (format: <local_ref> <local_sha> <remote_ref> <remote_sha>)
 while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
-  # Pula deleção de branches
+  # Skip branch deletions
   [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
 
-  # Se está pushando main, não aplica o limite
+  # Pushing main itself is not size-checked
   [ "$remote_ref" = "refs/heads/main" ] && continue
 
-  # Verifica se origin/main existe
+  # Make sure origin/main exists
   if ! git rev-parse --verify "$BASE" > /dev/null 2>&1; then
-    echo "⚠️  $BASE não encontrado — pulando verificação de tamanho de PR."
+    echo "WARN  $BASE not found — skipping PR size check."
     continue
   fi
 
-  # Conta arquivos alterados
+  # Count changed files
   FILES=$(git diff --name-only "$BASE...$local_sha" | wc -l | tr -d ' ')
 
-  # Conta linhas alteradas (adições + remoções)
+  # Count changed lines (insertions + deletions)
   STAT=$(git diff --shortstat "$BASE...$local_sha" 2>/dev/null)
   INSERTIONS=$(echo "$STAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
   DELETIONS=$(echo "$STAT"  | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' || echo 0)
   LINES=$((${INSERTIONS:-0} + ${DELETIONS:-0}))
 
   echo ""
-  echo "📊 Tamanho do PR:"
-  echo "   Arquivos alterados : $FILES / $MAX_FILES"
-  echo "   Linhas alteradas   : $LINES / $MAX_LINES"
+  echo "PR size:"
+  echo "  Files changed : $FILES / $MAX_FILES"
+  echo "  Lines changed : $LINES / $MAX_LINES"
   echo ""
 
   if [ "$FILES" -gt "$MAX_FILES" ]; then
-    echo "❌ PUSH BLOQUEADO — muitos arquivos alterados ($FILES > $MAX_FILES)."
-    echo "   Quebre o trabalho em PRs menores e mais focados."
+    echo "PUSH BLOCKED — too many files changed ($FILES > $MAX_FILES)."
+    echo "Split the work into smaller, more focused PRs."
     echo ""
     exit 1
   fi
 
   if [ "$LINES" -gt "$MAX_LINES" ]; then
-    echo "❌ PUSH BLOQUEADO — PR muito grande ($LINES linhas > $MAX_LINES)."
-    echo "   Quebre o trabalho em PRs menores e mais focados."
+    echo "PUSH BLOCKED — PR too large ($LINES lines > $MAX_LINES)."
+    echo "Split the work into smaller, more focused PRs."
     echo ""
     exit 1
   fi
 
-  echo "✅ Tamanho OK — pode enviar."
+  echo "Size OK — proceeding."
   echo ""
 done
