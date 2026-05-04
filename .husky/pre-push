@@ -1,0 +1,54 @@
+#!/bin/sh
+# Block the push if the PR is too large vs main.
+# Limits: 6000 changed lines or 50 changed files.
+
+MAX_LINES=6000
+MAX_FILES=50
+BASE=origin/main
+
+# Read what is being pushed (format: <local_ref> <local_sha> <remote_ref> <remote_sha>)
+while IFS=' ' read -r local_ref local_sha remote_ref remote_sha; do
+  # Skip branch deletions
+  [ "$local_sha" = "0000000000000000000000000000000000000000" ] && continue
+
+  # Pushing main itself is not size-checked
+  [ "$remote_ref" = "refs/heads/main" ] && continue
+
+  # Make sure origin/main exists
+  if ! git rev-parse --verify "$BASE" > /dev/null 2>&1; then
+    echo "WARN  $BASE not found — skipping PR size check."
+    continue
+  fi
+
+  # Count changed files
+  FILES=$(git diff --name-only "$BASE...$local_sha" | wc -l | tr -d ' ')
+
+  # Count changed lines (insertions + deletions)
+  STAT=$(git diff --shortstat "$BASE...$local_sha" 2>/dev/null)
+  INSERTIONS=$(echo "$STAT" | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
+  DELETIONS=$(echo "$STAT"  | grep -oE '[0-9]+ deletion'  | grep -oE '[0-9]+' || echo 0)
+  LINES=$((${INSERTIONS:-0} + ${DELETIONS:-0}))
+
+  echo ""
+  echo "PR size:"
+  echo "  Files changed : $FILES / $MAX_FILES"
+  echo "  Lines changed : $LINES / $MAX_LINES"
+  echo ""
+
+  if [ "$FILES" -gt "$MAX_FILES" ]; then
+    echo "PUSH BLOCKED — too many files changed ($FILES > $MAX_FILES)."
+    echo "Split the work into smaller, more focused PRs."
+    echo ""
+    exit 1
+  fi
+
+  if [ "$LINES" -gt "$MAX_LINES" ]; then
+    echo "PUSH BLOCKED — PR too large ($LINES lines > $MAX_LINES)."
+    echo "Split the work into smaller, more focused PRs."
+    echo ""
+    exit 1
+  fi
+
+  echo "Size OK — proceeding."
+  echo ""
+done
