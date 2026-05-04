@@ -104,6 +104,6 @@ npm run dev:frontend
 `.husky/pre-push` blocks pushes when the diff vs `origin/main` exceeds:
 
 - 50 files
-- 3000 lines (insertions + deletions)
+- 6000 lines (insertions + deletions)
 
 Pushes to `main` itself are skipped. To activate, run `npm install` at the repo root once — `husky` auto-installs the hooks via the `prepare` script.

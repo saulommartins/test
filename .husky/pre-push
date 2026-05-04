@@ -1,8 +1,8 @@
 #!/bin/sh
 # Block the push if the PR is too large vs main.
-# Limits: 3000 changed lines or 50 changed files.
+# Limits: 6000 changed lines or 50 changed files.
 
-MAX_LINES=3000
+MAX_LINES=6000
 MAX_FILES=50
 BASE=origin/main
 
